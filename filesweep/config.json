@@ -1,0 +1,13 @@
+{
+ "safe_mode": true,
+ "rename_rules": {
+   "prefix": "BYTARI_",
+   "date_format": "YYYYMMDD"
+ },
+ "sort_rules": {
+   "images": ["jpg", "jpeg", "png", "gif"],
+   "documents": ["pdf", "docx", "txt"],
+   "audio": ["mp3", "wav"],
+   "archives": ["zip", "rar"]
+ }
+}
