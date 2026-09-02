@@ -1,115 +1,165 @@
 # main.py
-# Orchestrates the FileSweep workflow.
-def main():
-   # 1. Load config
-   config = load_config()
-   # 2. Scan folder
-   files = scan_folder(config["target_folder"])
-   # 3. Rename files
-   renamed_files = rename_files(files, config["rename_rules"])
-   # 4. Sort files
-   sorted_files = sort_files(renamed_files, config["sort_rules"])
-   # 5. Detect duplicates
-   duplicates = detect_duplicates(sorted_files)
-   # 6. Generate report
-   generate_report(
-       renamed_files=renamed_files,
-       sorted_files=sorted_files,
-       duplicates=duplicates
-   )
+# Entry point for the FileSweep application.
+#
+# Responsibilities:
+# - Load configuration settings
+# - Coordinate application workflow
+# - Call modules in the correct order
+#
+# Workflow:
+# 1. Load configuration
+# 2. Scan target folder
+# 3. Preview rename actions
+# 4. Detect duplicates
+# 5. Sort files
+# 6. Generate report
 
-# -----------------------------
-# Helper functions (pseudocode)
-# -----------------------------
+import json
+from pathlib import Path
+from collections import Counter
+
+from modules.scanner import scan_folder
+from modules.renamer import rename_files
+
+
+# Load settings from config.json.
+#
+# Current Settings:
+# - target_folder
+# - dry_run
+# - rename_rules
+#
+# Future Settings:
+# - sort_rules
+# - recursive_scan
+# - duplicate_handling
+# - logging_options
 def load_config():
-   # Load config.json from disk
-   # Parse JSON into a Python dictionary
-   # Return the config dictionary
-   pass
+    """
+    Load application settings from config.json.
 
-def scan_folder(path):
-   # Create an empty list to store file paths
-   files = []
-   # Loop through every item in the folder
-   for item in list_items_in_folder(path):
-       # If the item is a file, add it to the list
-       if is_file(item):
-           files.append(item)
-       # (Optional future feature)
-       # If the item is a folder, you could scan inside it too
-       # but for now, FileSweep only scans the top level
-   # Return the list of files found
-   return files
+    Returns:
+        dict:
+            Configuration values.
+    """
 
-def rename_files(files, rules):
-   # Create an empty list to store renamed file paths
-   renamed = []
-   # Loop through each file in the list
-   for file in files:
-       # 1. Start with the original filename
-       new_name = get_original_filename(file)
-       # 2. Apply prefix rule (if enabled)
-       if rules["prefix"]:
-           new_name = apply_prefix(new_name, rules["prefix"])
-       # 3. Apply date formatting rule (if enabled)
-       if rules["date_format"]:
-           new_name = apply_date_format(new_name, rules["date_format"])
-       # 4. Apply category-based naming (optional future feature)
-       # Example: "IMG_2024_..." or "DOC_2024_..."
-       # new_name = apply_category_name(new_name)
-       # 5. Rename the file on disk (actual code later)
-       # rename_file_on_disk(file, new_name)
-       # 6. Add the new name to the list
-       renamed.append(new_name)
-   # Return the list of renamed files
-   return renamed
+    config_path = Path(__file__).parent / "config.json"
 
-def sort_files(files, rules):
-   # Create an empty list to store sorted file paths
-   sorted_list = []
-   # Loop through each file
-   for file in files:
-       # 1. Determine file type (extension)
-       file_type = get_file_extension(file)
-       # 2. Look up the correct folder based on rules
-       target_folder = rules.get(file_type, "misc")
-       # 3. Create folder if it doesn't exist
-       # create_folder_if_missing(target_folder)
-       # 4. Move file into the folder
-       # move_file(file, target_folder)
-       # 5. Add to sorted list
-       sorted_list.append((file, target_folder))
-   # Return sorted file info
-   return sorted_list
+    with open(config_path, "r") as file:
+        return json.load(file)
 
-def detect_duplicates(files):
-   # Create a dictionary to store hashes
-   seen_hashes = {}
-   # Create a list to store duplicates
-   duplicates = []
-   # Loop through each file
-   for file in files:
-       # 1. Generate hash for the file
-       file_hash = generate_file_hash(file)
-       # 2. Check if we've seen this hash before
-       if file_hash in seen_hashes:
-           # This file is a duplicate
-           duplicates.append(file)
-       else:
-           # First time seeing this file
-           seen_hashes[file_hash] = file
-   # Return list of duplicates
-   return duplicates
 
-def generate_report(**kwargs):
-   # Build a summary of:
-   # - renamed files
-   # - sorted files
-   # - duplicates
-   #
-   # Write the summary to a text or JSON file
-   pass
+def format_size(size_bytes):
+    """
+    Convert bytes into a human-readable format.
 
-# Run the program
+    Args:
+        size_bytes (int):
+            Size in bytes.
+
+    Returns:
+        str:
+            Human-readable size.
+    """
+
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
+
+        if size_bytes < 1024:
+            return f"{size_bytes:.2f} {unit}"
+
+        size_bytes /= 1024
+
+    return f"{size_bytes:.2f} PB"
+
+
+def main():
+
+    # Load application settings
+    config = load_config()
+
+    print("\nConfig Loaded:")
+    print("--------------")
+    print(config)
+
+    # Scan target folder
+    files = scan_folder(
+        config["target_folder"]
+    )
+
+    # Preview rename operations
+    rename_results = rename_files(
+        files,
+        config["rename_rules"],
+        config["dry_run"]
+    )
+
+    # Count folders in target directory
+    folder_path = Path(
+        config["target_folder"]
+    )
+
+    folder_count = len([
+        item
+        for item in folder_path.iterdir()
+        if item.is_dir()
+    ])
+
+    # Calculate total file size
+    total_size = sum(
+        file.stat().st_size
+        for file in files
+    )
+
+    # Display scan summary
+    print("\nScan Summary:")
+    print("-------------")
+    print(f"Target Folder : {config['target_folder']}")
+    print(f"Dry Run       : {config['dry_run']}")
+    print(f"Files Found   : {len(files)}")
+    print(f"Folders Found : {folder_count}")
+    print(f"Total Size    : {format_size(total_size)}")
+    print(f"Rename Actions: {len(rename_results)}")
+
+    # Analyze file types found during scan
+    file_types = []
+
+    for file in files:
+
+        extension = file.suffix.lower()
+
+        if extension:
+            file_types.append(extension)
+        else:
+            file_types.append(
+                "[no extension]"
+            )
+
+    extension_counts = Counter(
+        file_types
+    )
+
+    print("\nFile Type Breakdown:")
+    print("--------------------")
+
+    for extension, count in sorted(
+        extension_counts.items()
+    ):
+        print(
+            f"{extension:<15} {count}"
+        )
+
+    # Display discovered files
+    #
+    # Future Enhancement:
+    # - Add file size column
+    # - Add last modified date
+    # - Export scan results to report
+    print("\nFiles Found:")
+    print("------------")
+
+    for file in files:
+        print(file)
+
+
 if __name__ == "__main__":
-   main()
+    main()
